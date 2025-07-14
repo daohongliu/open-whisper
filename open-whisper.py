@@ -8,8 +8,6 @@ import sys
 from pywhispercpp.model import Model
 import keyboard
 import pyautogui
-import tkinter as tk
-from tkinter import ttk, messagebox
 import ctypes
 import platform
 import re
@@ -27,31 +25,7 @@ def play_beep(frequency=1000, duration=150):
         except Exception:
             pass
 
-class ModelSelector:
-    def __init__(self, models):
-        self.selected_model = None
-        self.models = models
-
-    def show(self):
-        self.root = tk.Tk()
-        self.root.title("Select Whisper Model")
-        self.root.geometry("300x120")
-        self.root.resizable(False, False)
-
-        tk.Label(self.root, text="Choose Whisper model:").pack(pady=(15, 5))
-        self.model_var = tk.StringVar(value=self.models[0])
-        self.dropdown = ttk.Combobox(self.root, textvariable=self.model_var, values=self.models, state="readonly")
-        self.dropdown.pack(pady=5)
-
-        start_btn = tk.Button(self.root, text="Start", command=self._on_start)
-        start_btn.pack(pady=(5, 15))
-
-        self.root.mainloop()
-        return self.selected_model
-
-    def _on_start(self):
-        self.selected_model = self.model_var.get()
-        self.root.destroy()
+# Removed ModelSelector class (GUI)
 
 class VoiceTranscriber:
     def __init__(self, model_name):
@@ -193,6 +167,7 @@ class VoiceTranscriber:
             print(f"Error processing audio: {e}")
     
     def _inject_text_ctypes(self, text):
+        text = text + " "  # Always append a space
         if platform.system() != 'Windows':
             # Fallback for non-Windows
             pyautogui.typewrite(text)
@@ -234,14 +209,8 @@ def main():
     print("  Ctrl+Alt+V: Replay last transcription")
     print("  Ctrl+C: Exit")
 
-    # Model selection UI
-    available_models = ["base.en", "small.en", "medium.en", "large-v3"]
-    selector = ModelSelector(available_models)
-    model_name = selector.show()
-    if not model_name:
-        print("No model selected. Exiting.")
-        return
-
+    # Always use base.en model by default
+    model_name = "base.en"
     transcriber = VoiceTranscriber(model_name)
     
     try:
