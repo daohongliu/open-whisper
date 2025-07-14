@@ -1,0 +1,4 @@
+pywhispercpp
+pyaudio
+keyboard
+pyautogui
