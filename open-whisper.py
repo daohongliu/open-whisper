@@ -8,9 +8,39 @@ import sys
 from pywhispercpp.model import Model
 import keyboard
 import pyautogui
+import tkinter as tk
+from tkinter import ttk, messagebox
+import ctypes
+import platform
+
+class ModelSelector:
+    def __init__(self, models):
+        self.selected_model = None
+        self.models = models
+
+    def show(self):
+        self.root = tk.Tk()
+        self.root.title("Select Whisper Model")
+        self.root.geometry("300x120")
+        self.root.resizable(False, False)
+
+        tk.Label(self.root, text="Choose Whisper model:").pack(pady=(15, 5))
+        self.model_var = tk.StringVar(value=self.models[0])
+        self.dropdown = ttk.Combobox(self.root, textvariable=self.model_var, values=self.models, state="readonly")
+        self.dropdown.pack(pady=5)
+
+        start_btn = tk.Button(self.root, text="Start", command=self._on_start)
+        start_btn.pack(pady=(5, 15))
+
+        self.root.mainloop()
+        return self.selected_model
+
+    def _on_start(self):
+        self.selected_model = self.model_var.get()
+        self.root.destroy()
 
 class VoiceTranscriber:
-    def __init__(self):
+    def __init__(self, model_name):
         self.is_recording = False
         self.audio_data = []
         self.audio_stream = None
@@ -18,20 +48,19 @@ class VoiceTranscriber:
         self.last_transcription = ""
         self.model = None
         self.recording_thread = None
-        
+        self.model_name = model_name
         # Audio settings
         self.FORMAT = pyaudio.paInt16
         self.CHANNELS = 1
         self.RATE = 16000
         self.CHUNK = 1024
-        
         self.setup_whisper()
         self.setup_audio()
     
     def setup_whisper(self):
         try:
-            self.model = Model('base.en')
-            print("Whisper model loaded successfully")
+            self.model = Model(self.model_name)
+            print(f"Whisper model '{self.model_name}' loaded successfully")
         except Exception as e:
             print(f"Error loading Whisper model: {e}")
             print("Available models: base.en, small.en, medium.en, large-v3, etc.")
@@ -140,12 +169,22 @@ class VoiceTranscriber:
         except Exception as e:
             print(f"Error processing audio: {e}")
     
+    def _inject_text_ctypes(self, text):
+        if platform.system() != 'Windows':
+            # Fallback for non-Windows
+            pyautogui.typewrite(text)
+            return
+        user32 = ctypes.windll.user32
+        hwnd = user32.GetForegroundWindow()
+        WM_CHAR = 0x0102
+        for char in text:
+            user32.PostMessageW(hwnd, WM_CHAR, ord(char), 0)
+        print(f"Injected (ctypes): {text}")
+
     def _type_text(self, text):
         try:
-            # Small delay to ensure the user has released the hotkey
             time.sleep(0.1)
-            pyautogui.typewrite(text)
-            print(f"Typed: {text}")
+            self._inject_text_ctypes(text)
         except Exception as e:
             print(f"Error typing text: {e}")
     
@@ -171,8 +210,16 @@ def main():
     print("  Ctrl+Alt+Space: Hold to record, release to transcribe and type")
     print("  Ctrl+Alt+V: Replay last transcription")
     print("  Ctrl+C: Exit")
-    
-    transcriber = VoiceTranscriber()
+
+    # Model selection UI
+    available_models = ["base.en", "small.en", "medium.en", "large-v3"]
+    selector = ModelSelector(available_models)
+    model_name = selector.show()
+    if not model_name:
+        print("No model selected. Exiting.")
+        return
+
+    transcriber = VoiceTranscriber(model_name)
     
     try:
         # Set up hotkey handlers
@@ -203,7 +250,7 @@ def main():
                     on_record_key_release()
         
         keyboard.hook(on_key_event)
-        keyboard.add_hotkey('ctrl+alt+v', on_replay_key, suppress=False)
+        keyboard.add_hotkey('ctrl+alt+v', on_replay_key, suppress=True)
         
         print("Ready! Running in background. Use Ctrl+Alt+Space to record.")
         
