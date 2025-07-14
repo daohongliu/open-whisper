@@ -12,6 +12,20 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import ctypes
 import platform
+import re
+
+# Simple beep function (cross-platform)
+def play_beep(frequency=1000, duration=150):
+    if platform.system() == 'Windows':
+        import winsound
+        winsound.Beep(frequency, duration)
+    else:
+        # Try to play a beep on other platforms
+        try:
+            sys.stdout.write('\a')
+            sys.stdout.flush()
+        except Exception:
+            pass
 
 class ModelSelector:
     def __init__(self, models):
@@ -91,6 +105,7 @@ class VoiceTranscriber:
             )
             
             print("Recording started...")
+            play_beep(frequency=1200, duration=120)  # Activation beep
             
             # Start recording in a separate thread
             self.recording_thread = threading.Thread(target=self._record_audio)
@@ -124,6 +139,7 @@ class VoiceTranscriber:
                 self.audio_stream.close()
             
             print("Recording stopped. Processing...")
+            play_beep(frequency=800, duration=120)  # Deactivation beep
             self._process_audio()
             
         except Exception as e:
@@ -133,39 +149,46 @@ class VoiceTranscriber:
         if not self.audio_data:
             print("No audio data to process")
             return
-        
         try:
+            # Pad with silence if duration < 1 second
+            total_frames = len(self.audio_data) * self.CHUNK
+            min_frames = self.RATE  # 1 second of audio
+            if total_frames < min_frames:
+                missing_frames = min_frames - total_frames
+                silence_chunk = b'\x00' * (self.CHUNK * 2)  # 2 bytes per sample for paInt16
+                num_silence_chunks = (missing_frames + self.CHUNK - 1) // self.CHUNK
+                for _ in range(num_silence_chunks):
+                    self.audio_data.append(silence_chunk)
+                print(f"Padded audio with {num_silence_chunks} chunks of silence.")
             # Save audio to temporary WAV file
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
                 temp_filename = temp_file.name
-                
                 with wave.open(temp_filename, 'wb') as wf:
                     wf.setnchannels(self.CHANNELS)
                     wf.setsampwidth(self.p.get_sample_size(self.FORMAT))
                     wf.setframerate(self.RATE)
                     wf.writeframes(b''.join(self.audio_data))
-            
             # Transcribe audio
             print("Transcribing...")
             segments = self.model.transcribe(temp_filename)
-            
             # Extract text from segments
             transcription = ""
             for segment in segments:
                 transcription += segment.text + " "
-            
             transcription = transcription.strip()
-            
+            # Ignore all-caps, underscore, square-bracketed output
+            if re.fullmatch(r"\[[A-Z0-9_ ]+\]", transcription):
+                print(f"Ignored non-speech transcription: {transcription}")
+                os.unlink(temp_filename)
+                return
             if transcription:
                 self.last_transcription = transcription
                 print(f"Transcription: {transcription}")
                 self._type_text(transcription)
             else:
                 print("No speech detected")
-            
             # Clean up temporary file
             os.unlink(temp_filename)
-            
         except Exception as e:
             print(f"Error processing audio: {e}")
     
