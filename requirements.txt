@@ -2,3 +2,4 @@ pywhispercpp
 pyaudio
 keyboard
 pyautogui
+pystray
