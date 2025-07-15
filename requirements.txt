@@ -3,3 +3,4 @@ pyaudio
 keyboard
 pyautogui
 pystray
+flask

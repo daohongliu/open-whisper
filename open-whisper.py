@@ -6,11 +6,12 @@ import tempfile
 import os
 import sys
 from pywhispercpp.model import Model
-import keyboard
 import pyautogui
 import ctypes
 import platform
 import re
+from flask import Flask, request, jsonify
+import signal
 
 # Simple beep function (cross-platform)
 def play_beep(frequency=1000, duration=150):
@@ -18,7 +19,6 @@ def play_beep(frequency=1000, duration=150):
         import winsound
         winsound.Beep(frequency, duration)
     else:
-        # Try to play a beep on other platforms
         try:
             sys.stdout.write('\a')
             sys.stdout.flush()
@@ -37,6 +37,7 @@ class VoiceTranscriber:
         self.model = None
         self.recording_thread = None
         self.model_name = model_name
+        self.lock = threading.Lock()
         # Audio settings
         self.FORMAT = pyaudio.paInt16
         self.CHANNELS = 1
@@ -63,31 +64,28 @@ class VoiceTranscriber:
             sys.exit(1)
     
     def start_recording(self):
-        if self.is_recording:
-            return
-        
-        try:
-            self.is_recording = True
-            self.audio_data = []
-            
-            self.audio_stream = self.p.open(
-                format=self.FORMAT,
-                channels=self.CHANNELS,
-                rate=self.RATE,
-                input=True,
-                frames_per_buffer=self.CHUNK
-            )
-            
-            print("Recording started...")
-            play_beep(frequency=1200, duration=120)  # Activation beep
-            
-            # Start recording in a separate thread
-            self.recording_thread = threading.Thread(target=self._record_audio)
-            self.recording_thread.start()
-            
-        except Exception as e:
-            print(f"Error starting recording: {e}")
-            self.is_recording = False
+        with self.lock:
+            if self.is_recording:
+                return False
+            try:
+                self.is_recording = True
+                self.audio_data = []
+                self.audio_stream = self.p.open(
+                    format=self.FORMAT,
+                    channels=self.CHANNELS,
+                    rate=self.RATE,
+                    input=True,
+                    frames_per_buffer=self.CHUNK
+                )
+                print("Recording started...")
+                play_beep(frequency=1200, duration=120)  # Activation beep
+                self.recording_thread = threading.Thread(target=self._record_audio)
+                self.recording_thread.start()
+                return True
+            except Exception as e:
+                print(f"Error starting recording: {e}")
+                self.is_recording = False
+                return False
     
     def _record_audio(self):
         while self.is_recording:
@@ -99,32 +97,29 @@ class VoiceTranscriber:
                 break
     
     def stop_recording(self):
-        if not self.is_recording:
-            return
-        
-        self.is_recording = False
-        
-        try:
-            if self.recording_thread:
-                self.recording_thread.join()
-            
-            if self.audio_stream:
-                self.audio_stream.stop_stream()
-                self.audio_stream.close()
-            
-            print("Recording stopped. Processing...")
-            play_beep(frequency=800, duration=120)  # Deactivation beep
-            self._process_audio()
-            
-        except Exception as e:
-            print(f"Error stopping recording: {e}")
+        with self.lock:
+            if not self.is_recording:
+                return False
+            self.is_recording = False
+            try:
+                if self.recording_thread:
+                    self.recording_thread.join()
+                if self.audio_stream:
+                    self.audio_stream.stop_stream()
+                    self.audio_stream.close()
+                print("Recording stopped. Processing...")
+                play_beep(frequency=800, duration=120)  # Deactivation beep
+                self._process_audio()
+                return True
+            except Exception as e:
+                print(f"Error stopping recording: {e}")
+                return False
     
     def _process_audio(self):
         if not self.audio_data:
             print("No audio data to process")
             return
         try:
-            # Pad with silence if duration < 1 second
             total_frames = len(self.audio_data) * self.CHUNK
             min_frames = self.RATE  # 1 second of audio
             if total_frames < min_frames:
@@ -134,7 +129,6 @@ class VoiceTranscriber:
                 for _ in range(num_silence_chunks):
                     self.audio_data.append(silence_chunk)
                 print(f"Padded audio with {num_silence_chunks} chunks of silence.")
-            # Save audio to temporary WAV file
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
                 temp_filename = temp_file.name
                 with wave.open(temp_filename, 'wb') as wf:
@@ -142,15 +136,12 @@ class VoiceTranscriber:
                     wf.setsampwidth(self.p.get_sample_size(self.FORMAT))
                     wf.setframerate(self.RATE)
                     wf.writeframes(b''.join(self.audio_data))
-            # Transcribe audio
             print("Transcribing...")
             segments = self.model.transcribe(temp_filename)
-            # Extract text from segments
             transcription = ""
             for segment in segments:
                 transcription += segment.text + " "
             transcription = transcription.strip()
-            # Ignore all-caps, underscore, square-bracketed output
             if re.fullmatch(r"\[[A-Z0-9_ ]+\]", transcription):
                 print(f"Ignored non-speech transcription: {transcription}")
                 os.unlink(temp_filename)
@@ -161,7 +152,6 @@ class VoiceTranscriber:
                 self._type_text(transcription)
             else:
                 print("No speech detected")
-            # Clean up temporary file
             os.unlink(temp_filename)
         except Exception as e:
             print(f"Error processing audio: {e}")
@@ -169,7 +159,6 @@ class VoiceTranscriber:
     def _inject_text_ctypes(self, text):
         text = text + " "  # Always append a space
         if platform.system() != 'Windows':
-            # Fallback for non-Windows
             pyautogui.typewrite(text)
             return
         user32 = ctypes.windll.user32
@@ -196,65 +185,52 @@ class VoiceTranscriber:
     def cleanup(self):
         if self.is_recording:
             self.stop_recording()
-        
         if self.p:
             self.p.terminate()
-        
         print("Cleanup completed")
 
-def main():
-    print("Open Whisper starting...")
-    print("Running in background. Hotkeys:")
-    print("  Ctrl+Alt+Space: Hold to record, release to transcribe and type")
-    print("  Ctrl+Alt+V: Replay last transcription")
-    print("  Ctrl+C: Exit")
+# Flask app for IPC
+app = Flask(__name__)
+transcriber = VoiceTranscriber("base.en")
 
-    # Always use base.en model by default
-    model_name = "base.en"
-    transcriber = VoiceTranscriber(model_name)
-    
-    try:
-        # Set up hotkey handlers
-        recording_key_pressed = False
-        
-        def on_record_key_press():
-            nonlocal recording_key_pressed
-            if not recording_key_pressed:
-                recording_key_pressed = True
-                transcriber.start_recording()
-        
-        def on_record_key_release():
-            nonlocal recording_key_pressed
-            if recording_key_pressed:
-                recording_key_pressed = False
-                transcriber.stop_recording()
-        
-        def on_replay_key():
-            transcriber.replay_last_transcription()
-        
-        # Register hotkeys using key event handlers instead
-        def on_key_event(e):
-            if e.event_type == keyboard.KEY_DOWN and e.name == 'space' and keyboard.is_pressed('ctrl') and keyboard.is_pressed('alt'):
-                if not recording_key_pressed:
-                    on_record_key_press()
-            elif e.event_type == keyboard.KEY_UP and e.name == 'space':
-                if recording_key_pressed:
-                    on_record_key_release()
-        
-        keyboard.hook(on_key_event)
-        keyboard.add_hotkey('ctrl+alt+v', on_replay_key, suppress=True)
-        
-        print("Ready! Running in background. Use Ctrl+Alt+Space to record.")
-        
-        # Keep the program running
-        keyboard.wait('ctrl+c')
-        
-    except KeyboardInterrupt:
-        print("\nExiting...")
-    except Exception as e:
-        print(f"Error in main loop: {e}")
-    finally:
-        transcriber.cleanup()
+@app.route("/start_recording", methods=["POST"])
+def start_recording():
+    success = transcriber.start_recording()
+    return jsonify({"success": success})
+
+@app.route("/stop_recording", methods=["POST"])
+def stop_recording():
+    success = transcriber.stop_recording()
+    return jsonify({"success": success})
+
+@app.route("/replay", methods=["POST"])
+def replay():
+    transcriber.replay_last_transcription()
+    return jsonify({"success": True})
+
+@app.route("/shutdown", methods=["POST"])
+def shutdown():
+    print("Shutdown requested via /shutdown endpoint.")
+    transcriber.cleanup()
+    return jsonify({"success": True})
 
 if __name__ == "__main__":
-    main()
+    def handle_exit(signum, frame):
+        print("Signal received, cleaning up...")
+        transcriber.cleanup()
+        os._exit(0)
+
+    signal.signal(signal.SIGINT, handle_exit)
+    signal.signal(signal.SIGTERM, handle_exit)
+    try:
+        print("Open Whisper Flask server starting...")
+        print("Endpoints:")
+        print("  POST /start_recording")
+        print("  POST /stop_recording")
+        print("  POST /replay")
+        print("  POST /shutdown")
+        print("Use the AutoHotkey script to control recording.")
+        app.run(host="127.0.0.1", port=17800, debug=False, use_reloader=False)
+    finally:
+        transcriber.cleanup()
+        os._exit(0)
