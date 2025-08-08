@@ -193,8 +193,11 @@ class VoiceTranscriber:
 app = Flask(__name__)
 transcriber = VoiceTranscriber("base.en")
 
-@app.route("/start_recording", methods=["POST"])
+@app.route("/start_recording", methods=["POST", "GET"])
 def start_recording():
+    if request.method == "GET":
+        # This is just for connection testing
+        return jsonify({"status": "server_running"})
     success = transcriber.start_recording()
     return jsonify({"success": success})
 
