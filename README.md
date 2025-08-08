@@ -67,7 +67,7 @@ MIT License
 
 ## Credits
 - [OpenAI Whisper](https://github.com/openai/whisper)
-- [pywhispercpp](https://github.com/aarnphm/pywhispercpp)
+- [pywhispercpp](https://github.com/absadiki/pywhispercpp)
 - [PyAudio](https://people.csail.mit.edu/hubert/pyaudio/)
 - [AutoHotkey](https://www.autohotkey.com/)
 
