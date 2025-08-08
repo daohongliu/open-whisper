@@ -30,10 +30,10 @@ SetTimer, TestConnection, 3000
 return
 
 ; Ctrl+Alt+V: Replay last transcription (suppressed)
-^!v::
-    HttpPost("http://127.0.0.1:17800/replay")
-    SendInput, {Ctrl up}{Alt up}
-return
+;^!v::
+;    HttpPost("http://127.0.0.1:17800/replay")
+;    SendInput, {Ctrl up}{Alt up}
+;return
 
 ; Ctrl+Alt+Q: Gracefully shutdown the Flask server and exit (suppressed)
 ^!q::

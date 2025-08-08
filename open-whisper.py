@@ -6,7 +6,7 @@ import tempfile
 import os
 import sys
 from pywhispercpp.model import Model
-import pyautogui
+import pyperclip
 import ctypes
 import platform
 import re
@@ -158,15 +158,9 @@ class VoiceTranscriber:
     
     def _inject_text_ctypes(self, text):
         text = text + " "  # Always append a space
-        if platform.system() != 'Windows':
-            pyautogui.typewrite(text)
-            return
-        user32 = ctypes.windll.user32
-        hwnd = user32.GetForegroundWindow()
-        WM_CHAR = 0x0102
-        for char in text:
-            user32.PostMessageW(hwnd, WM_CHAR, ord(char), 0)
-        print(f"Injected (ctypes): {text}")
+        pyperclip.copy(text)
+        print(f"Copied to clipboard: {text}")
+        play_beep(frequency=1500, duration=120)  # Clipboard beep
 
     def _type_text(self, text):
         try:
@@ -206,10 +200,10 @@ def stop_recording():
     success = transcriber.stop_recording()
     return jsonify({"success": success})
 
-@app.route("/replay", methods=["POST"])
-def replay():
-    transcriber.replay_last_transcription()
-    return jsonify({"success": True})
+## @app.route("/replay", methods=["POST"])
+## def replay():
+##     transcriber.replay_last_transcription()
+##     return jsonify({"success": True})
 
 @app.route("/shutdown", methods=["POST"])
 def shutdown():
