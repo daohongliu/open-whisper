@@ -27,6 +27,9 @@ pip install -r requirements.txt
    ```
    Double-click the AutoHotkey script to start. This will automatically launch the Python backend in the background.
 
+
+**Note:** After recording and transcription, the output is automatically copied to your clipboard. To paste the transcribed text into any application, simply press **Ctrl+V** where you want the text to appear.
+
 2. **Hotkeys:**
    - **Windows+Alt+Space**: Hold to record, release to stop recording and transcribe
    - **Ctrl+Alt+Q**: Quit the application
@@ -58,3 +61,12 @@ MIT License
 - [pywhispercpp](https://github.com/aarnphm/pywhispercpp)
 - [PyAudio](https://people.csail.mit.edu/hubert/pyaudio/)
 - [AutoHotkey](https://www.autohotkey.com/)
+
+## Auto-Start on System Startup
+
+For convenience, you can have Open Whisper start automatically when you log in to Windows. Just add a shortcut to `openwhisper-hotkeys.ahk` in your Startup folder:
+
+- Press `Win + R`, type `shell:startup`, and press Enter.
+- Place a shortcut to `openwhisper-hotkeys.ahk` in the folder that opens.
+
+To disable auto-start, simply remove the shortcut from the Startup folder.
