@@ -21,6 +21,15 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+## Beep Sounds
+
+Open Whisper uses beep sounds to indicate different stages of operation:
+
+- **Activation beep (high-pitched):** When you start recording (Windows+Alt+Space pressed)
+- **Deactivation beep (medium-pitched):** When you stop recording (Windows+Alt+Space released)
+- **Clipboard beep (distinct):** When the transcription is copied to your clipboard
+
+These sounds help you know when the program is listening, processing, and ready to paste your text.
 1. **Start the application:**
    ```
    openwhisper-hotkeys.ahk
