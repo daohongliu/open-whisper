@@ -12,7 +12,7 @@ Open Whisper is a minimal Python wrapper for [whispercpp](https://github.com/aar
 - Python 3.8+
 - [PyWhisperCpp](https://github.com/aarnphm/pywhispercpp)
 - pyaudio
-- pyautogui
+- pyperclip
 - AutoHotkey (Windows)
 
 Install Python dependencies with:
@@ -29,14 +29,13 @@ pip install -r requirements.txt
 
 2. **Hotkeys:**
    - **Windows+Alt+Space**: Hold to record, release to stop recording and transcribe
-   - **Ctrl+Alt+V**: Replay the last transcription
    - **Ctrl+Alt+Q**: Quit the application
 
 ## How It Works
 - The AutoHotkey script automatically starts the Python Flask server in the background
 - Audio is recorded from the default microphone using PyAudio
 - Audio is transcribed using the selected Whisper model (default: `base.en`)
-- The transcribed text is automatically typed into whatever application has focus
+- The transcribed text is automatically copied to your clipboard for easy pasting
 - Communication between AutoHotkey and Python happens via HTTP requests to localhost
 
 ## Model Selection
@@ -49,7 +48,6 @@ Available models: `base.en`, `small.en`, `medium.en`, `large-v3`, etc.
 ## Customizing Hotkeys
 Edit the hotkey combinations in `openwhisper-hotkeys.ahk`:
 - `#!Space` = Windows+Alt+Space (record)
-- `^!v` = Ctrl+Alt+V (replay)
 - `^!q` = Ctrl+Alt+Q (quit)
 
 ## License
